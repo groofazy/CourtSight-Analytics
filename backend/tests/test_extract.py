@@ -5,7 +5,7 @@ from data_pipeline.extract import extract_all_active_players
 
 def test_extract_returns_df():
     df = extract_all_active_players(season='2024-25')
-    assert isinstance(df, pd.Dataframe)
+    assert isinstance(df, pd.DataFrame)
     assert not df.empty
 
 def test_req_cols():
