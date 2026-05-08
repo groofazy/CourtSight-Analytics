@@ -1,6 +1,11 @@
 # batch extraction
 import pandas as pd
 from nba_api.stats.endpoints import leaguedashplayerstats, leaguedashteamstats, leaguehustlestatsplayer, playerdashptshots
+from nba_api.stats.endpoints import leaguegamefinder
+from nba_api.stats.endpoints import playbyplayv3
+from nba_api.stats.endpoints import shotchartdetail
+import time
+
 
 # calling swar_nba_api at the end of each day and updating existing data in our data warehouse
 
@@ -94,8 +99,55 @@ def rotation_players_df():
 
     return rotation_players
     
+# NEXUS ENDPOINTS
+def extract_past_game_ids(season='2024-25', n_games=200):
+    print(f"Fetching game IDs for {season}...")
+    try:
+        gamefinder = leaguegamefinder.LeagueGameFinder(
+            season_nullable=season,
+            league_id_nullable='00',
+            season_type_nullable='Regular Season'
+        )
+        games_df = gamefinder.get_data_frames()[0]
+        game_ids = games_df['GAME_ID'].unique()[:n_games]
+        print(f"Found {len(game_ids)} game IDs")
+        return list(game_ids), games_df
+    except Exception as e:
+        print(f"Failed to fetch game IDs: {e}")
+        return [], None
 
-                    
+def extract_play_by_play(game_id: str):
+    try:
+        time.sleep(1.0)
+        pbp = playbyplayv3.PlayByPlayV3(
+            game_id=game_id,
+            start_period=1,
+            end_period=4,
+            timeout=60
+        )
+        df = pbp.get_data_frames()[0]
+        if df.empty:
+            return None
+        return df
+    except Exception as e:
+        print(f"Failed PBP for {game_id}: {e}")
+        return None 
+
+def extract_shot_chart(game_id: str, team_id: int):
+    try:
+        time.sleep(0.6)
+        shot_chart = shotchartdetail.ShotChartDetail(
+            team_id=team_id,
+            player_id=0,
+            game_id_nullable=game_id,
+            context_measure_simple="FGA"
+        )
+        df = shot_chart.get_data_frames()[0]
+        return df
+    except Exception as e:
+        print(f"Failed shot chart for {game_id}: {e}")
+        return None
+
 
 if __name__ == "__main__":
     extract_all_active_players_basic()
