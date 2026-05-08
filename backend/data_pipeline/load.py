@@ -21,6 +21,18 @@ def load_snapshots_to_supabase(snapshots: list):
         supabase.table("game_snapshots").insert(chunk).execute()
         print(f"Inserted {i + len(chunk)}/{len(snapshots)} snapshots")
 
+def load_games_to_supabase(games: list):
+    if not games:
+        print("No games to load")
+        return
+    supabase = get_supabase()
+    chunk_size = 500
+    for i in range(0, len(games), chunk_size):
+        chunk = games[i:i + chunk_size]
+        supabase.table("games").upsert(chunk).execute()
+        print(f"Upserted {i + len(chunk)}/{len(games)} games")
+
+
 def load_shots_to_supabase(shots: list):
     if not shots:
         return

@@ -100,6 +100,23 @@ def rotation_players_df():
     return rotation_players
     
 # NEXUS ENDPOINTS
+def extract_season_games(season='2024-25', season_type='Regular Season'):
+    print(f"Fetching {season_type} games for {season}...")
+    try:
+        time.sleep(0.6)
+        finder = leaguegamefinder.LeagueGameFinder(
+            season_nullable=season,
+            league_id_nullable='00',
+            season_type_nullable=season_type,
+        )
+        df = finder.get_data_frames()[0]
+        print(f"Found {len(df['GAME_ID'].unique())} unique games")
+        return df
+    except Exception as e:
+        print(f"Failed to fetch season games: {e}")
+        return None
+
+
 def extract_past_game_ids(season='2024-25', n_games=200):
     print(f"Fetching game IDs for {season}...")
     try:

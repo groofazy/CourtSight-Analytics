@@ -1,6 +1,6 @@
-from data_pipeline.extract import extract_past_game_ids, extract_play_by_play, extract_shot_chart
-from data_pipeline.transform import get_home_team_won, transform_pbp_to_snapshots, transform_shots
-from data_pipeline.load import load_snapshots_to_supabase, load_shots_to_supabase
+from data_pipeline.extract import extract_past_game_ids, extract_play_by_play, extract_shot_chart, extract_season_games
+from data_pipeline.transform import get_home_team_won, transform_pbp_to_snapshots, transform_shots, transform_games
+from data_pipeline.load import load_snapshots_to_supabase, load_shots_to_supabase, load_games_to_supabase
 from supabase import create_client
 import os
 import joblib
@@ -12,9 +12,40 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def run_pipeline(n_games=200, season='2024-25'):
-    print(f"Starting pipeline for {n_games} games...")
-    game_ids, games_df = extract_past_game_ids(season=season, n_games=n_games)
+def run_games_pipeline(seasons=None, season_types=None):
+    if seasons is None:
+        seasons = ['2024-25']
+    if season_types is None:
+        season_types = ['Regular Season', 'Playoffs']
+
+    for season in seasons:
+        for season_type in season_types:
+            games_df = extract_season_games(season=season, season_type=season_type)
+            if games_df is None or games_df.empty:
+                print(f"No data for {season} {season_type}")
+                continue
+            games = transform_games(games_df, label=season_type)
+            load_games_to_supabase(games)
+            print(f"Done: {len(games)} games for {season} {season_type}")
+
+
+def run_pipeline(n_games=200, season='2024-25', season_type='Regular Season'):
+    print(f"Starting pipeline for {n_games} {season_type} games ({season})...")
+    try:
+        import time
+        time.sleep(0.6)
+        from nba_api.stats.endpoints import leaguegamefinder
+        finder = leaguegamefinder.LeagueGameFinder(
+            season_nullable=season,
+            league_id_nullable='00',
+            season_type_nullable=season_type,
+        )
+        games_df = finder.get_data_frames()[0]
+        game_ids = list(games_df['GAME_ID'].unique()[:n_games])
+    except Exception as e:
+        print(f"Failed to fetch game IDs: {e}")
+        return
+    print(f"Found {len(game_ids)} game IDs")
 
     for i, game_id in enumerate(game_ids):
         print(f"Processing {i+1}/{len(game_ids)}: {game_id}")
@@ -90,5 +121,7 @@ def train_model():
     return accuracy
 
 if __name__ == "__main__":
-    # run_pipeline(n_games=200)
-    train_model()
+    # train_model()
+    # run_games_pipeline(seasons=['2024-25'], season_types=['Regular Season', 'Playoffs'])
+    run_pipeline(n_games=500, season='2024-25', season_type='Regular Season')
+    run_pipeline(n_games=500, season='2024-25', season_type='Playoffs')
